@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field, ValidationError
 BROKER = "broker.emqx.io"
 PUERTO = 1883
 TOPICO_SUSCRIPCION = "unmsm/callao/camara/+/telemetria"
-UMBRAL_PELIGRO = 8.0   # °C
+UMBRAL_PELIGRO = 30.0  # °C
 LOG_ERRORES = "log_errores.txt"
 
 
@@ -47,7 +47,7 @@ def registrar_error(topico: str, payload_raw: str, mensaje_error: str):
         f"[{timestamp}] Tópico: {topico}\n"
         f"  Payload: {payload_raw}\n"
         f"  Error:   {mensaje_error}\n"
-        f"{'─' * 70}\n"
+        f"{'-' * 70}\n"
     )
     with open(LOG_ERRORES, "a", encoding="utf-8") as f:
         f.write(linea)
@@ -68,14 +68,14 @@ def on_connect(client, userdata, flags, rc, properties):
 def on_message(client, userdata, msg):
     raw_payload = msg.payload.decode(errors="replace")
     print(f"\n[SUSCRIPTOR] Mensaje recibido en: {msg.topic}")
-    print(f"  Payload raw: {raw_payload}")
+    print(f"  Payload: {raw_payload[:80]}...") if len(raw_payload) > 80 else print(f"  Payload: {raw_payload}")
 
     # --- 1. Intentar decodificar JSON ------------------------------------
     try:
         datos_json = json.loads(raw_payload)
     except json.JSONDecodeError as e:
         registrar_error(msg.topic, raw_payload, f"JSON inválido: {e}")
-        print(f"  → Error: JSON inválido — registrado en {LOG_ERRORES}")
+        print(f"  -> Error: JSON invalido - registrado en {LOG_ERRORES}")
         return
 
     # --- 2. Validar contra el esquema Pydantic ---------------------------
@@ -83,20 +83,20 @@ def on_message(client, userdata, msg):
         lectura = LecturaSensor(**datos_json)
     except ValidationError as e:
         registrar_error(msg.topic, raw_payload, f"Validación Pydantic: {e}")
-        print(f"  → Error: violación de esquema — registrado en {LOG_ERRORES}")
+        print(f"  -> Error: violacion de esquema - registrado en {LOG_ERRORES}")
         return
 
     # --- 3. Datos válidos — comprobar umbral ----------------------------
     temp = lectura.valor
-    print(f"  ✓ Datos validados — Cámara: {lectura.camara_id}, "
+    print(f"  + Datos validados - Camara: {lectura.camara_id}, "
           f"Temperatura: {temp} {lectura.unidad}")
 
     if temp > UMBRAL_PELIGRO:
-        print(f"  ⚠ [PELIGRO] ¡Pérdida de cadena de frío en Cámara "
+        print(f"  ! [PELIGRO] Perdida de cadena de frio en Camara "
               f"{lectura.camara_id}!")
     else:
-        print(f"  → Temperatura dentro del rango seguro "
-              f"(≤ {UMBRAL_PELIGRO} °C).")
+        print(f"  -> Temperatura dentro del rango seguro "
+              f"(<= {UMBRAL_PELIGRO} C).")
 
 
 # ---------------------------------------------------------------------------

@@ -21,7 +21,7 @@ PUERTO = 1883
 TOPICO_BASE = "unmsm/callao/camara"
 CAMARAS = ["01", "02"]
 INTERVALO = 2          # segundos entre publicaciones
-UMBRAL_PELIGRO = 8.0   # °C — estándar cadena de frío farmacéutica
+UMBRAL_PELIGRO = 30.0  # °C — umbral de pérdida de cadena de frío
 
 # ---------------------------------------------------------------------------
 # Control de inyección de fallos
@@ -56,6 +56,13 @@ FALLOS = [
         "valor": 120.0,
         "unidad": "Celsius",
     },
+    # 6. JSON válido con temperatura peligrosa (pasa Pydantic pero supera umbral)
+    lambda c_id: {
+        "sensor_id": c_id,
+        "timestamp": time.time(),
+        "valor": 35.0,
+        "unidad": "Celsius",
+    },
 ]
 
 contador_publicaciones = 0
@@ -86,7 +93,7 @@ def publicar(cliente: mqtt.Client, topico: str, payload, camara_id: str):
 
     info = cliente.publish(topico, mensaje, qos=1)
     info.wait_for_publish()
-    print(f"[PUBLICADOR] Cámara {camara_id} → {topico}: {mensaje}")
+    print(f"[PUBLICADOR] Camara {camara_id} -> {topico}: {mensaje}")
 
 
 # ---------------------------------------------------------------------------
@@ -119,7 +126,7 @@ def main():
                 if contador_publicaciones % 10 == 0:
                     idx_fallo = (contador_publicaciones // 10 - 1) % len(FALLOS)
                     payload = FALLOS[idx_fallo](cam_id)
-                    print(f"  → INYECTANDO FALLO tipo {idx_fallo + 1}")
+                    print(f"  -> INYECTANDO FALLO tipo {idx_fallo + 1}")
                 else:
                     payload = generar_lectura_normal(cam_id)
 
